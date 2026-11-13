@@ -1,5 +1,3 @@
-import { isAuthenticated } from '../server/auth.js';
-
 const requestWindows = new Map();
 const requireEnv = (name) => {
   const value = process.env[name];
@@ -75,7 +73,6 @@ function resolveUpstream(requestUrl) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: '허용되지 않은 요청입니다.' });
-  if (!isAuthenticated(req)) return res.status(401).json({ error: '로그인이 필요합니다.' });
   if (isRateLimited(req)) return res.status(429).json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' });
   try {
     const upstream = resolveUpstream(req.url);
