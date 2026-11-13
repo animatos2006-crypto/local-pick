@@ -48,7 +48,7 @@ function boundsToRect(bounds) {
 export async function searchKakaoPlaces({ bounds, query, category, nationwide = false }) {
   const viewportRect = boundsToRect(bounds);
   if (!query && !viewportRect) return [];
-  let documents = [];
+  let documents;
   if (query) {
     const commonParams = {
       query,

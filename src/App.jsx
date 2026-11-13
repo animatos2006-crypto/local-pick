@@ -6,7 +6,7 @@ import {
   LocateFixed, Map as MapIcon, MapPin, Menu, Navigation, Plus, Search, SlidersHorizontal,
   Sparkles, Star, Store, X,
 } from 'lucide-react';
-import { districts, regions, sourceLabels, stores } from './data/stores';
+import { regions, sourceLabels, stores } from './data/stores';
 import './delete-button.css';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { reverseGeocodeKakao, searchKakaoPlaces, searchRegionLocations } from './services/kakaoLocal';
@@ -204,24 +204,6 @@ function StoreCard({ store, saved, onSave, onSelect, congestion }) {
       <p className="store-address"><MapPin size={14} /> {store.region} {store.district}</p>
       <div className="tag-row">{store.tags.slice(0, 3).map((tag) => <span key={tag}>#{tag}</span>)}</div>
     </article>
-  );
-}
-
-function RegionPicker({ region, district, onRegion, onDistrict, onClose }) {
-  return (
-    <div className="region-popover">
-      <div className="popover-head"><strong>검색 지역</strong><button className="icon-button" onClick={onClose}><X size={18}/></button></div>
-      <div className="region-grid">
-        {Object.keys(regions).map((name) => <button className={region === name ? 'selected' : ''} key={name} onClick={() => onRegion(name)}>{name}</button>)}
-      </div>
-      {region !== '전국' && <>
-        <p className="popover-label">세부 지역</p>
-        <div className="district-grid">
-          {(districts[region] || ['전체']).map((name) => <button className={district === name ? 'selected' : ''} key={name} onClick={() => onDistrict(name)}>{name}</button>)}
-        </div>
-      </>}
-      <button className="wide-secondary" onClick={() => { onRegion('전국'); onClose(); }}>전국으로 검색 범위 넓히기</button>
-    </div>
   );
 }
 
@@ -643,7 +625,7 @@ export default function App() {
       .catch(() => { if (!cancelled) setCongestionInsight(null); })
       .finally(() => { if (!cancelled) setCongestionInsightLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedCongestion?.name]);
+  }, [selectedCongestion]);
 
   useEffect(() => {
     if (!roadTrafficVisible || !bounds) return undefined;
@@ -749,7 +731,6 @@ export default function App() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, region, district, apiLoading, publicLoading, filtered, sortMode]);
 
-  const hiddenCount = filtered.filter((s) => s.source === 'hidden').length;
   const independentCount = filtered.filter((s) => s.type === 'independent').length;
   const sortedStores = useMemo(() => {
     const items = [...filtered];
@@ -767,6 +748,8 @@ export default function App() {
   useEffect(() => {
     if (apiLoading || publicLoading) return;
     setDisplayedMarkers(bounds ? filtered.filter((store) => bounds.contains([store.lat, store.lng])) : filtered);
+    // 지도 이동 중에는 기존 마커를 유지하고, 검색 결과가 바뀔 때만 다시 계산한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, apiLoading, publicLoading]);
   const visibleMarkers = displayedMarkers;
   const animatedTransitSegment = routeMode === 'publictraffic' && routeResult?.segments
@@ -829,7 +812,7 @@ export default function App() {
   const selectStore = (store) => { setSearchFocusStore(null); setSelectedStore(store); setMapLocationLabel([store.region, store.district].filter(Boolean).join(' ')); setMobileList(false); };
   const focusSearchResult = (store) => { setSelectedStore(null); setSearchFocusStore(store); setMapLocationLabel([store.region, store.district].filter(Boolean).join(' ')); setMobileList(false); };
   const chooseSearchSuggestion = (store) => { setChosenSearchResultId(store.id); setHighlightedSuggestionIndex(-1); focusSearchResult(store); };
-  const useCurrentLocationForRoute = (destination = routeDestination) => {
+  const requestCurrentLocationForRoute = (destination = routeDestination) => {
     if (!navigator.geolocation) { notify('이 브라우저에서는 위치 기능을 사용할 수 없습니다.'); return; }
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
@@ -847,7 +830,7 @@ export default function App() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
   };
-  const startRoute = (store) => useCurrentLocationForRoute({ name: store.name, lat: store.lat, lng: store.lng });
+  const startRoute = (store) => requestCurrentLocationForRoute({ name: store.name, lat: store.lat, lng: store.lng });
   const openRoutePlanner = () => { setRoutePlannerOpen(true); setRouteResult(null); setRouteError(''); };
   const closeRoute = () => { setRoutePlannerOpen(false); setRouteDestination(null); setRouteStart(null); setRouteWaypoints([]); setRouteResult(null); setSelectedRouteAlternativeIndex(0); setSelectedRouteSegmentIndex(null); setRouteError(''); };
   const handleMapBounds = (nextBounds) => {
@@ -924,7 +907,42 @@ export default function App() {
         <button className={`road-traffic-toggle ${roadTrafficVisible ? 'active' : ''}`} onClick={() => setRoadTrafficVisible((value) => !value)}><Navigation size={14}/>{roadTrafficVisible ? '도로상황 끄기' : '도로상황 보기'}<small>전국 실시간</small></button>
         {roadTrafficVisible && <div className={`road-traffic-card ${roadTrafficStatus}`}><div><strong>{roadTrafficStatus === 'loading' ? '도로정보 불러오는 중…' : roadTrafficStatus === 'error' ? '도로정보 연결 실패' : roadTraffic?.status || '정보 없음'}</strong>{roadTraffic?.averageSpeed !== null && roadTrafficStatus === 'ready' && <span>평균 {roadTraffic.averageSpeed}km/h · {roadTraffic.count.toLocaleString()}개 구간</span>}</div>{roadTrafficStatus === 'ready' && roadTraffic?.slowRoads.length > 0 && <small>느린 도로 · {roadTraffic.slowRoads.map((road) => `${road.name} ${road.speed}km/h`).join(' · ')}</small>}<em>현재 지도 범위의 측정 구간 평균</em></div>}
         {seoulCongestionUpdatedAt && congestionVisible && <div className="congestion-map-note"><strong>주변 혼잡도</strong><div className="congestion-legend"><span className="relaxed"/>여유<span className="normal"/>보통<span className="busy"/>약간 붐빔<span className="crowded"/>붐빔</div><small>서울시 지역 단위 · 5분마다 갱신</small></div>}
-        {routePlannerOpen && <RoutePlanner start={routeStart} destination={routeDestination} waypoints={routeWaypoints} mode={routeMode} result={routeResult} loading={routeLoading || locationLoading} error={routeError} selectedAlternativeIndex={selectedRouteAlternativeIndex} selectedSegmentIndex={selectedRouteSegmentIndex} onStart={(place) => { setRouteStart(place); setRouteResult(null); setSelectedRouteSegmentIndex(null); }} onDestination={(place) => { setRouteDestination(place); setRouteResult(null); setSelectedRouteSegmentIndex(null); }} onWaypoints={(items) => { setRouteWaypoints(items); setRouteResult(null); setSelectedRouteSegmentIndex(null); }} onMode={(value) => { setRouteMode(value); setSelectedRouteSegmentIndex(null); }} onCurrentLocation={() => useCurrentLocationForRoute()} onSwap={() => { const previousStart = routeStart; setRouteStart(routeDestination); setRouteDestination(previousStart); setRouteWaypoints([...routeWaypoints].reverse()); setRouteResult(null); setSelectedRouteSegmentIndex(null); setRouteError(''); }} onSelectAlternative={(index) => { const alternatives = routeResult?.alternatives || []; const selected = alternatives[index]; if (selected) { setRouteResult({ ...selected, alternatives }); setSelectedRouteAlternativeIndex(index); setSelectedRouteSegmentIndex(null); } }} onSelectSegment={setSelectedRouteSegmentIndex} onClose={closeRoute}/>} 
+        {routePlannerOpen && <RoutePlanner
+          start={routeStart}
+          destination={routeDestination}
+          waypoints={routeWaypoints}
+          mode={routeMode}
+          result={routeResult}
+          loading={routeLoading || locationLoading}
+          error={routeError}
+          selectedAlternativeIndex={selectedRouteAlternativeIndex}
+          selectedSegmentIndex={selectedRouteSegmentIndex}
+          onStart={(place) => { setRouteStart(place); setRouteResult(null); setSelectedRouteSegmentIndex(null); }}
+          onDestination={(place) => { setRouteDestination(place); setRouteResult(null); setSelectedRouteSegmentIndex(null); }}
+          onWaypoints={(items) => { setRouteWaypoints(items); setRouteResult(null); setSelectedRouteSegmentIndex(null); }}
+          onMode={(value) => { setRouteMode(value); setSelectedRouteSegmentIndex(null); }}
+          onCurrentLocation={() => requestCurrentLocationForRoute()}
+          onSwap={() => {
+            const previousStart = routeStart;
+            setRouteStart(routeDestination);
+            setRouteDestination(previousStart);
+            setRouteWaypoints([...routeWaypoints].reverse());
+            setRouteResult(null);
+            setSelectedRouteSegmentIndex(null);
+            setRouteError('');
+          }}
+          onSelectAlternative={(index) => {
+            const alternatives = routeResult?.alternatives || [];
+            const selected = alternatives[index];
+            if (selected) {
+              setRouteResult({ ...selected, alternatives });
+              setSelectedRouteAlternativeIndex(index);
+              setSelectedRouteSegmentIndex(null);
+            }
+          }}
+          onSelectSegment={setSelectedRouteSegmentIndex}
+          onClose={closeRoute}
+        />}
         {realtimeBuses.length > 0 || realtimeSubwayMarkers.length > 0
           ? <div className="transit-animation-note realtime">서울시 실시간 {realtimeBuses.length > 0 && realtimeSubwayMarkers.length > 0 ? '버스·열차' : realtimeBuses.length > 0 ? '버스 차량' : '열차'} 위치 · 15~20초마다 갱신</div>
           : animatedTransitSegment && <div className="transit-animation-note">버스·지하철 아이콘은 경로 안내용 애니메이션이며 실제 차량 위치가 아닙니다.{(realtimeBusError || realtimeSubwayError) && ` (${realtimeBusError || realtimeSubwayError})`}</div>}

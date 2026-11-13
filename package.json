@@ -12,13 +12,19 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.468.0",
     "react": "latest",
     "react-dom": "latest",
-    "leaflet": "^1.9.4",
     "react-leaflet": "^5.0.0",
-    "lucide-react": "^0.468.0"
+    "typescript": "latest",
+    "vite": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.14.0"
+  }
 }
